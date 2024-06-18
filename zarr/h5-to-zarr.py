@@ -274,10 +274,10 @@ if __name__ == '__main__':
         '%(levelname)s:%(name)s:%(funcName)s:%(message)s'))
     lggr.addHandler(lggr_handler)
 
-    with fsspec.open('/Users/decarlo/Downloads/zarr/3D_resolution_pattern_1xHR_003.h5',
+    with fsspec.open('/local/data/alberto/microCT/mouse_15mo_re_245.h5',
                      mode='rb', anon=False, requester_pays=True,
                      default_fill_cache=False) as f:
-        store = zarr.DirectoryStore('/Users/decarlo/Downloads/zarr/3D_resolution_pattern_1xHR_003.chunkstore')
+        store = zarr.DirectoryStore('/local/data/alberto/microCT/mouse_15mo_re_245_test_Zarr.zarr')
         h5chunks = Hdf5ToZarr(f, store, xarray=True)
         h5chunks.translate()
 
