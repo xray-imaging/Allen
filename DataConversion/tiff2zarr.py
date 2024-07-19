@@ -9,6 +9,21 @@ from utils import calculate_global_min_max, load_tiff_chunked, downsample
 from log import info, setup_custom_logger
 
 def save_zarr(volume, output_path, chunks, compression, pixel_size, mode='w', original_dtype=np.uint8):
+    """
+    Save a 3D volume to a Zarr store, creating a multiscale pyramid representation.
+
+    Parameters:
+    - volume (numpy array): The 3D volume data to be saved.
+    - output_path (str): The path to the output Zarr store.
+    - chunks (tuple of ints): The chunk size for the Zarr array.
+    - compression (str): The compression algorithm to use (e.g., 'blosclz', 'lz4', etc.).
+    - pixel_size (float): The size of the pixels in micrometers.
+    - mode (str, optional): The mode to open the Zarr store ('w' for write, 'a' for append). Default is 'w'.
+    - original_dtype (numpy dtype, optional): The original data type of the images. Default is np.uint8.
+
+    Returns:
+    - None
+    """
     store = zarr.DirectoryStore(output_path)
     compressor = Blosc(cname=compression, clevel=5, shuffle=2)
 
@@ -23,10 +38,7 @@ def save_zarr(volume, output_path, chunks, compression, pixel_size, mode='w', or
     datasets = []
 
     for level, data in enumerate(pyramid_levels):
-        if np.issubdtype(original_dtype, np.floating):
-            data = data.astype(np.int16)
-        else:
-            data = data.astype(original_dtype)
+        data = data.astype(original_dtype)
         
         dataset_name = f"{level}"
         if dataset_name in root_group:
@@ -72,9 +84,25 @@ def save_zarr(volume, output_path, chunks, compression, pixel_size, mode='w', or
 @click.option('--chunks', type=(int, int, int), default=(64, 64, 64), help='Chunk size for the Zarr array as a tuple of three integers.')
 @click.option('--compression', type=click.Choice(['blosclz', 'lz4', 'lz4hc', 'zlib', 'zstd']), default='blosclz', help='Compression algorithm to use for Zarr storage.')
 @click.option('--pixel_size', type=float, default=1.0, help='Pixel size in micrometers.')
-@click.option('--chunk_size', type=int, default=10, help='Number of TIFF images to load in each chunk.')
+@click.option('--chunk_size', type=int, default=64, help='Number of TIFF images to load in each chunk.')
 @click.option('--verbose', is_flag=True, help='Enable verbose logging.')
 def main(input_dir, output_path, dtype, chunks, compression, pixel_size, chunk_size, verbose):
+    """
+    Main function to process TIFF images and save them as a Zarr store with multiscale representations.
+
+    Parameters:
+    - input_dir (str): Path to the input directory containing TIFF images.
+    - output_path (str): Path to the output Zarr store.
+    - dtype (str): Data type of the images. Choices are 'int8', 'int16', 'int32', 'uint8', 'uint16', 'float32', 'float64'.
+    - chunks (tuple of ints): Chunk size for the Zarr array as a tuple of three integers.
+    - compression (str): Compression algorithm to use for Zarr storage. Choices are 'blosclz', 'lz4', 'lz4hc', 'zlib', 'zstd'.
+    - pixel_size (float): Pixel size in micrometers.
+    - chunk_size (int): Number of TIFF images to load in each chunk.
+    - verbose (bool): Enable verbose logging.
+
+    Returns:
+    - None
+    """
     setup_custom_logger(verbose=verbose)
     
     dtype_map = {'int8': np.int8, 'int16': np.int16, 'int32': np.int32, 'uint8': np.uint8, 'uint16': np.uint16, 'float32': np.float32, 'float64': np.float64}
