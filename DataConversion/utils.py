@@ -3,7 +3,31 @@ import numpy as np
 import tifffile as tiff
 from skimage.transform import resize
 from log import info
+import time
+import sys
+from functools import wraps
 
+def progress_bar(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        total = kwargs.pop('total', 100)  # Total number of iterations (default is 100)
+        bar_length = 40  # Length of the progress bar
+
+        for i in range(total):
+            result = func(*args, **kwargs)  # Call the original function
+            percent_complete = (i + 1) / total
+            bar = '#' * int(percent_complete * bar_length) + '-' * (bar_length - int(percent_complete * bar_length))
+            sys.stdout.write(f'\rProgress: [{bar}] {percent_complete:.2%}')
+            sys.stdout.flush()
+            time.sleep(0.01)  # Simulate work being done
+        
+        print("\nCompleted!")
+        return result
+    
+    return wrapper
+
+
+@progress_bar
 def calculate_global_min_max(input_dir, bin_factor=4):
     """
     Calculate the global minimum and maximum pixel values of all TIFF images in a directory after downsampling (binning).
@@ -34,9 +58,49 @@ def calculate_global_min_max(input_dir, bin_factor=4):
         global_min = min(global_min, binned_image.min())
         global_max = max(global_max, binned_image.max())
     
-    info(f"Global min and max found: {global_min}, dtype: {global_max}")
+    #info(f"Global min and max found: {global_min}, dtype: {global_max}")
     return global_min, global_max
+      
+    
 
+def minmaxHisto(input_dir, thr=1e-5, num_bins=1000):
+    # Read the image files
+    file_list = sorted([os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith(('.tiff','.tif'))])
+    if not file_list:
+        raise ValueError(f"No TIFF files found in the directory: {input_dir}")
+
+    # Choose the middle image from the list
+    middle_image_path = file_list[len(file_list) // 2]
+
+    # Read the image
+    image = tiff.imread(middle_image_path)
+    if image is None:
+        raise ValueError(f"Image not found at {middle_image_path}")
+
+    # Calculate the histogram
+    hist, bin_edges = np.histogram(image, bins=num_bins)
+
+    # Find the start and end indices based on a threshold
+    threshold = np.max(hist) * thr
+    stend = np.where(hist > threshold)
+    if len(stend[0]) == 0:
+        raise ValueError("No significant histogram bins found.")
+
+    st = stend[0][0]
+    end = stend[0][-1]
+
+    # Determine min and max values
+    mmin = bin_edges[st]
+    mmax = bin_edges[end + 1]
+
+    # Ensure min and max are not too close
+    if np.isclose(mmin, mmax):
+        raise ValueError("The minimum and maximum values are too close. Adjust the threshold or bin count.")
+
+    return mmin, mmax
+
+    
+       
 def load_tiff_chunked(input_dir, dtype, chunk_size, start_index=0, global_min=None, global_max=None):
     """
     Load TIFF images from a directory in chunks and convert them to a specified data type, optionally normalizing the values.
@@ -81,7 +145,7 @@ def load_tiff_chunked(input_dir, dtype, chunk_size, start_index=0, global_min=No
 
         zarr_chunk[i] = image.astype(dtype)
         
-    info(f"Loaded TIFF chunk with shape: {zarr_chunk.shape}, dtype: {zarr_chunk.dtype}")
+    #info(f"Loaded TIFF chunk with shape: {zarr_chunk.shape}, dtype: {zarr_chunk.dtype}")
     return zarr_chunk, end_index
 
 def downsample(data, scale_factor=2, max_levels=6):

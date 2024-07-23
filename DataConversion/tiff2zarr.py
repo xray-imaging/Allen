@@ -5,7 +5,7 @@ import zarr
 import click
 import json
 from numcodecs import Blosc
-from utils import calculate_global_min_max, load_tiff_chunked, downsample
+from utils import calculate_global_min_max, load_tiff_chunked, downsample, minmaxHisto
 from log import info, setup_custom_logger
 
 def save_zarr(volume, output_path, chunks, compression, pixel_size, mode='w', original_dtype=np.uint8):
@@ -106,9 +106,9 @@ def main(input_dir, output_path, dtype, chunks, compression, pixel_size, chunk_s
     setup_custom_logger(verbose=verbose)
     
     dtype_map = {'int8': np.int8, 'int16': np.int16, 'int32': np.int32, 'uint8': np.uint8, 'uint16': np.uint16, 'float32': np.float32, 'float64': np.float64}
-
-    global_min, global_max = calculate_global_min_max(input_dir)
-
+    global_min, global_max = minmaxHisto(input_dir)
+    #global_min, global_max = calculate_global_min_max(input_dir)
+    info(f"Global min and max found: {global_min}, dtype: {global_max}")
     start_index = 0
     mode = 'w'
 
